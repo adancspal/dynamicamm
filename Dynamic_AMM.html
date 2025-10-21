@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dynamic Fee AMM Simulator</title>
+  <style>
+    :root {
+      --bg: #0f172a;        /* slate-900 */
+      --panel: #111827;     /* gray-900 */
+      --muted: #334155;     /* slate-600 */
+      --text: #e5e7eb;      /* gray-200 */
+      --accent: #22c55e;    /* green-500 */
+      --warn: #f59e0b;      /* amber-500 */
+      --error: #ef4444;     /* red-500 */
+      --border: #1f2937;    /* gray-800 */
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 800px at 80% -20%, #1f2937, #0b1022 60%, #0a0f20 100%);
+      color: var(--text);
+    }
+    header {
+      padding: 24px 20px 8px;
+      display: grid;
+      gap: 6px;
+    }
+    h1 { font-size: 22px; margin: 0; letter-spacing: 0.2px; }
+    p.sub { margin: 0; color: #9ca3af; font-size: 13px; }
+    .container {
+      padding: 16px 20px 40px;
+      display: grid; gap: 16px;
+    }
+    .grid { display: grid; gap: 12px; }
+    @media (min-width: 980px) {
+      .grid { grid-template-columns: 1.1fr 1.2fr; }
+    }
+    .card {
+      background: rgba(17,24,39,0.75);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      backdrop-filter: blur(6px);
+    }
+    .section-title { font-size: 14px; color: #9ca3af; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: grid; gap: 6px; }
+    label { font-size: 12px; color: #94a3b8; }
+    input, select {
+      width: 100%; padding: 10px 12px; border-radius: 12px;
+      border: 1px solid #273043; background: #0b1222; color: var(--text);
+      outline: none; font-size: 14px;
+    }
+    input:focus, select:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.2); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    button {
+      border: 1px solid #1f2937; border-radius: 12px; padding: 10px 14px; cursor: pointer;
+      background: linear-gradient(180deg, #1e293b, #111827);
+      color: var(--text); font-weight: 600; letter-spacing: .2px;
+    }
+    button.primary { background: linear-gradient(180deg, #22c55e, #15803d); border-color: #14532d; color: #041308; }
+    button.ghost { background: transparent; }
+    .note { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+    .result pre {
+      margin: 0; background: #0b1222; border: 1px solid #273043; padding: 14px; border-radius: 12px; overflow: auto;
+      font-size: 13px; line-height: 1.45; max-height: 420px;
+    }
+    .pill {
+      display: inline-flex; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 999px; border: 1px solid #273043; background: #0b1222; font-size: 12px; color: #cbd5e1;
+    }
+    .stack { display: grid; gap: 10px; }
+    .inline { display: inline-flex; align-items: center; gap: 8px; }
+    .muted { color: #9ca3af; }
+    footer { padding: 16px 20px 30px; color: #64748b; font-size: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dynamic Fee AMM — Oracle-Pegged Simulator</h1>
+    <p class="sub">Single-file demo. Set pool state, pick trade, and see fee % and units (USDC). Optionally apply the trade to update the pool.</p>
+  </header>
+  <div class="container">
+    <div class="grid">
+      <!-- Left: Inputs -->
+      <div class="card">
+        <h3 class="section-title">Pool & Parameters</h3>
+        <div class="stack">
+          <div class="row">
+            <div class="field">
+              <label>vD — Pool TD balance</label>
+              <input id="vD" type="number" step="any" value="50000" />
+            </div>
+            <div class="field">
+              <label>vS — Pool USDC balance</label>
+              <input id="vS" type="number" step="any" value="100000" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Oracle Price (USDC per TD)</label>
+              <input id="Poracle" type="number" step="any" value="2.0" />
+            </div>
+            <div class="field">
+              <label>α — Sensitivity</label>
+              <input id="alpha" type="number" step="any" value="1.0" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Base Fee f<sub>base</sub> (fraction)</label>
+              <input id="fbase" type="number" step="any" value="0.003" />
+            </div>
+            <div class="field">
+              <label>Min / Max Fee (fraction)</label>
+              <div class="row">
+                <input id="fmin" type="number" step="any" value="0.001" />
+                <input id="fmax" type="number" step="any" value="0.01" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <hr style="border: none; border-top: 1px solid var(--border); margin: 14px 0"/>
+        <h3 class="section-title">Trade</h3>
+        <div class="stack">
+          <div class="row">
+            <div class="field">
+              <label>Direction</label>
+              <select id="direction">
+                <option value="buy" selected>Buy TD (pay USDC)</option>
+                <option value="sell">Sell TD (receive USDC)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Enter either Amount TD or Amount USDC</label>
+              <div class="row">
+                <input id="amountTD" type="number" step="any" placeholder="Amount TD" />
+                <input id="amountUSDC" type="number" step="any" placeholder="Amount USDC" />
+              </div>
+            </div>
+          </div>
+          <label class="inline"><input type="checkbox" id="applyTrade" /> <span>Apply trade to pool after simulation</span></label>
+          <div class="actions">
+            <button class="primary" id="simulateBtn">Simulate</button>
+            <button class="ghost" id="resetBtn">Reset</button>
+          </div>
+          <div class="note">Fee is computed from the <b>pre-trade</b> pool state using r = (vD × Poracle) / vS. Buy uses price = Poracle × (1 + f). Sell uses price = Poracle × (1 - f).</div>
+        </div>
+      </div>
+
+      <!-- Right: Results -->
+      <div class="card result">
+        <h3 class="section-title">Result</h3>
+        <div class="stack" id="summaryPills" style="display:none"></div>
+        <pre id="output">Fill the form and click "Simulate".</pre>
+      </div>
+    </div>
+  </div>
+  <footer>
+    Built for demo purposes. No external libraries. © 2025
+  </footer>
+
+  <script>
+    // -------- Core math (mirrors whitepaper) --------
+    const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+    function computeFeePct({ vD, vS, Poracle, fbase, fmin, fmax, alpha }) {
+      const r = (vD * Poracle) / vS;
+      const f = clamp(fbase * Math.pow(r, alpha), fmin, fmax);
+      return { r, f };
+    }
+
+    function simulateTrade(params) {
+      const { type, amountTD, amountUSDC, vD, vS, Poracle, fbase, fmin, fmax, alpha } = params;
+      if (!['buy', 'sell'].includes(type)) throw new Error('Direction must be buy or sell');
+      if (!(vD > 0 && vS > 0)) throw new Error('Pool balances must be positive');
+      if (!(Poracle > 0)) throw new Error('Oracle price must be positive');
+
+      const feeFromR = (r) => clamp(fbase * Math.pow(r, alpha), fmin, fmax);
+      const tol = 1e-12;
+      const maxIter = 64;
+
+      let qtyTD, f = feeFromR((vD * Poracle) / vS); // initial guess
+      let pricePerTD, feeUSDC, grossUSDC, netUSDC, rPost;
+
+      if (type === 'buy') {
+        if (isFinite(amountTD)) {
+          qtyTD = amountTD;
+          for (let i = 0; i < maxIter; i++) {
+            const payment = qtyTD * Poracle * (1 + f);
+            const vDpost = vD - qtyTD;
+            const vSpost = vS + payment;
+            if (vDpost < 0) throw new Error('Insufficient TD in pool for this buy.');
+            rPost = (vDpost * Poracle) / vSpost;
+            const fNew = feeFromR(rPost);
+            if (Math.abs(fNew - f) < tol) { f = fNew; break; }
+            f = fNew;
+          }
+          pricePerTD = Poracle * (1 + f);
+          grossUSDC = qtyTD * Poracle;
+          feeUSDC   = qtyTD * Poracle * f;
+          netUSDC   = qtyTD * pricePerTD; // paid
+        } else if (isFinite(amountUSDC)) {
+          for (let i = 0; i < maxIter; i++) {
+            qtyTD = amountUSDC / (Poracle * (1 + f));
+            const vDpost = vD - qtyTD;
+            const vSpost = vS + amountUSDC;
+            if (vDpost < 0) throw new Error('Insufficient TD in pool for this buy.');
+            rPost = (vDpost * Poracle) / vSpost;
+            const fNew = feeFromR(rPost);
+            if (Math.abs(fNew - f) < tol) { f = fNew; break; }
+            f = fNew;
+          }
+          pricePerTD = Poracle * (1 + f);
+          grossUSDC = qtyTD * Poracle;
+          feeUSDC   = qtyTD * Poracle * f;
+          netUSDC   = amountUSDC; // paid
+        } else throw new Error('Provide amount TD or amount USDC');
+      } else { // sell
+        if (isFinite(amountTD)) {
+          qtyTD = amountTD;
+          for (let i = 0; i < maxIter; i++) {
+            const proceeds = qtyTD * Poracle * (1 - f);
+            const vDpost = vD + qtyTD;
+            const vSpost = vS - proceeds;
+            if (vSpost < 0) throw new Error('Insufficient USDC in pool for this sell.');
+            rPost = (vDpost * Poracle) / vSpost;
+            const fNew = feeFromR(rPost);
+            if (Math.abs(fNew - f) < tol) { f = fNew; break; }
+            f = fNew;
+          }
+          pricePerTD = Poracle * (1 - f);
+          grossUSDC = qtyTD * Poracle;
+          feeUSDC   = qtyTD * Poracle * f;
+          netUSDC   = qtyTD * pricePerTD; // received
+        } else if (isFinite(amountUSDC)) {
+          for (let i = 0; i < maxIter; i++) {
+            qtyTD = amountUSDC / (Poracle * (1 - f));
+            const vDpost = vD + qtyTD;
+            const vSpost = vS - amountUSDC;
+            if (vSpost < 0) throw new Error('Insufficient USDC in pool for this sell.');
+            rPost = (vDpost * Poracle) / vSpost;
+            const fNew = feeFromR(rPost);
+            if (Math.abs(fNew - f) < tol) { f = fNew; break; }
+            f = fNew;
+          }
+          pricePerTD = Poracle * (1 - f);
+          grossUSDC = qtyTD * Poracle;
+          feeUSDC   = qtyTD * Poracle * f;
+          netUSDC   = amountUSDC; // received
+        } else throw new Error('Provide amount TD or amount USDC');
+      }
+
+      return {
+        direction: type,
+        oraclePrice_USDC_per_TD: Poracle,
+        imbalanceRatio_r: rPost,
+        feePct: f * 100,
+        priceUsed_USDC_per_TD: pricePerTD,
+        tradeSize_TD: qtyTD,
+        fee_USDC: feeUSDC,
+        oracleValue_USDC: grossUSDC,
+        totalPaidOrReceived_USDC: netUSDC,
+      };
+    }
+
+    function applyTradeToPool(pool, trade) {
+      const { direction, tradeSize_TD, totalPaidOrReceived_USDC } = {
+        direction: trade.direction,
+        tradeSize_TD: trade.tradeSize_TD,
+        totalPaidOrReceived_USDC: trade.totalPaidOrReceived_USDC
+      };
+      const next = { ...pool };
+      if (direction === 'buy') {
+        // User receives TD, pays USDC to pool
+        next.vD -= tradeSize_TD;
+        next.vS += totalPaidOrReceived_USDC;
+      } else {
+        // Sell TD: user gives TD, receives USDC from pool
+        next.vD += tradeSize_TD;
+        next.vS -= totalPaidOrReceived_USDC;
+      }
+      return next;
+    }
+
+    // -------- UI glue --------
+    const $ = id => document.getElementById(id);
+
+    function readParams() {
+      const vD = parseFloat($("vD").value);
+      const vS = parseFloat($("vS").value);
+      const Poracle = parseFloat($("Poracle").value);
+      const alpha = parseFloat($("alpha").value);
+      const fbase = parseFloat($("fbase").value);
+      const fmin  = parseFloat($("fmin").value);
+      const fmax  = parseFloat($("fmax").value);
+      const type = $("direction").value;
+      const amountTD = parseFloat($("amountTD").value);
+      const amountUSDC = parseFloat($("amountUSDC").value);
+      const applyTrade = $("applyTrade").checked;
+      return { vD, vS, Poracle, alpha, fbase, fmin, fmax, type, amountTD, amountUSDC, applyTrade };
+    }
+
+    function formatNumber(n, digits = 6) {
+      if (!isFinite(n)) return String(n);
+      const abs = Math.abs(n);
+      const opts = abs >= 1 ? { maximumFractionDigits: 4 } : { maximumSignificantDigits: digits };
+      return n.toLocaleString(undefined, opts);
+    }
+
+    function pill(label, value) {
+      const span = document.createElement('span');
+      span.className = 'pill';
+      span.innerHTML = `<span class="muted">${label}</span><b>${value}</b>`;
+      return span;
+    }
+
+    function render(result, poolBefore, poolAfter) {
+      const out = $("output");
+      const pills = $("summaryPills");
+      pills.innerHTML = '';
+      pills.style.display = 'grid';
+      pills.append(
+        pill('Direction', result.direction.toUpperCase()),
+        pill('Fee %', formatNumber(result.feePct, 4) + '%'),
+        pill(result.direction === 'buy' ? 'USDC Paid' : 'USDC Received', formatNumber(result.totalPaidOrReceived_USDC)),
+        pill('Fee (USDC)', formatNumber(result.fee_USDC)),
+        pill('Price Used', formatNumber(result.priceUsed_USDC_per_TD)),
+        pill('r', formatNumber(result.imbalanceRatio_r))
+      );
+
+      const payload = {
+        pool_before: poolBefore,
+        inputs: {
+          direction: result.direction,
+          oraclePrice_USDC_per_TD: result.oraclePrice_USDC_per_TD,
+        },
+        outputs: result,
+        pool_after: poolAfter || null
+      };
+      out.textContent = JSON.stringify(payload, (k, v) => typeof v === 'number' ? Number(v.toFixed(12)) : v, 2);
+    }
+
+    function reset() {
+      $("vD").value = 50000;
+      $("vS").value = 100000;
+      $("Poracle").value = 2.0;
+      $("alpha").value = 1.0;
+      $("fbase").value = 0.003;
+      $("fmin").value = 0.001;
+      $("fmax").value = 0.01;
+      $("direction").value = 'buy';
+      $("amountTD").value = '';
+      $("amountUSDC").value = '';
+      $("applyTrade").checked = false;
+      $("summaryPills").style.display = 'none';
+      $("output").textContent = 'Fill the form and click "Simulate".';
+    }
+
+    $("simulateBtn").addEventListener('click', () => {
+      try {
+        const p = readParams();
+        const { type, amountTD, amountUSDC, applyTrade, ...rest } = p;
+        const params = {
+          type,
+          amountTD: isFinite(amountTD) ? amountTD : undefined,
+          amountUSDC: isFinite(amountUSDC) ? amountUSDC : undefined,
+          ...rest
+        };
+        const poolBefore = { vD: rest.vD, vS: rest.vS };
+        const res = simulateTrade(params);
+        let poolAfter = null;
+        if (applyTrade) {
+          poolAfter = applyTradeToPool(poolBefore, res);
+          // Update inputs with new pool balances
+          $("vD").value = poolAfter.vD;
+          $("vS").value = poolAfter.vS;
+        }
+        render(res, poolBefore, poolAfter);
+      } catch (e) {
+        $("output").textContent = 'Error: ' + e.message;
+      }
+    });
+
+    $("resetBtn").addEventListener('click', reset);
+  </script>
+</body>
+</html>
