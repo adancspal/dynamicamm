@@ -230,8 +230,7 @@
   <div class="container">
     <h1>Virtual AMM + Anchor Price Playground</h1>
     <p class="muted">
-      Play with a TSLA / USDC-style pair. The AMM uses virtual constant-product reserves and an anchor price.
-      You can run multiple trades and see how prices & reserves move.
+      Anchor is the fair price. You choose Base and Quote inventory. Virtual AMM computes a deviation multiplier; user price = anchor × multiplier (plus fee).
     </p>
 
     <div class="grid">
@@ -264,9 +263,9 @@
           </div>
         </div>
 
-        <h3 style="margin-top:14px;">Initial virtual reserves</h3>
+        <h3 style="margin-top:14px;">Initial virtual reserves (inventory)</h3>
         <p class="muted">
-          These feed the virtual AMM. They do not have to match real wallet balances.
+          These are pure inventory for the virtual AMM. They do <strong>not</strong> have to match the anchor; anchor is fair price, reserves just control how strong the deviation is.
         </p>
 
         <div class="row">
@@ -276,7 +275,7 @@
           </div>
           <div>
             <label for="initQuote">Initial Quote reserve (R_quote)</label>
-            <input id="initQuote" type="number" step="0.0000001" value="200" />
+            <input id="initQuote" type="number" step="0.0000001" value="100" />
           </div>
         </div>
 
@@ -285,13 +284,13 @@
             🔄 Initialize / Reinitialize AMM
           </button>
           <button id="btnResetBaseline" class="btn btn-secondary">
-            🎯 Reset baseline to current reserves
+            🎯 Reset baseline (r₀ from current reserves)
           </button>
         </div>
 
         <p class="muted" style="margin-top:10px;">
-          Init/Reinit sets <code>R_base</code>, <code>R_quote</code>, <code>R_base0</code>, <code>R_quote0</code> and <code>k</code>.
-          Reset baseline keeps current reserves but recenters the curve (updates baseline).
+          Init sets <code>R_base</code>, <code>R_quote</code>, <code>R_base0</code>, <code>R_quote0</code>, <code>k</code>.
+          Baseline price ratio is <code>r₀ = R_quote0 / R_base0</code>. Anchor is an external fair price used on top.
         </p>
       </div>
 
@@ -320,11 +319,11 @@
             <span id="stateRQuote0" class="state-value">–</span>
           </div>
           <div class="state-item">
-            <span class="state-label">r0 = R_quote0 / R_base0</span>
+            <span class="state-label">r₀ = R_quote0 / R_base0</span>
             <span id="stateR0" class="state-value">–</span>
           </div>
           <div class="state-item">
-            <span class="state-label">r_pre = R_quote / R_base</span>
+            <span class="state-label">Reserve ratio R_quote / R_base</span>
             <span id="stateRpre" class="state-value">–</span>
           </div>
           <div class="state-item">
@@ -338,7 +337,7 @@
         </div>
 
         <p class="muted" style="margin-top:10px;">
-          All math is done on virtual reserves only. Real wallet balances are ignored in this toy playground.
+          Anchor is independent of reserves. Reserves drive the curve price <code>P_curve</code>, which becomes a multiplier over anchor.
         </p>
       </div>
     </div>
@@ -415,8 +414,8 @@
               <th>#</th>
               <th>Side</th>
               <th>amountIn</th>
-              <th>ΔBase</th>
-              <th>ΔQuote</th>
+              <th>ΔBase (virtual)</th>
+              <th>ΔQuote (virtual)</th>
               <th>P_curve</th>
               <th>m</th>
               <th>P_exec</th>
@@ -493,6 +492,7 @@
       const el = document.getElementById("tradeMessage");
       if (!text) {
         el.innerHTML = "";
+        el.className = "";
         return;
       }
       el.className = isError ? "error" : "success";
@@ -544,11 +544,16 @@
     document.getElementById("btnInit").addEventListener("click", () => {
       const initBase = parseFloat(document.getElementById("initBase").value);
       const initQuote = parseFloat(document.getElementById("initQuote").value);
-      const anchor = parseFloat(document.getElementById("anchorPrice").value || "0");
+      const anchor = parseFloat(document.getElementById("anchorPrice").value);
 
       if (!Number.isFinite(initBase) || initBase <= 0 ||
           !Number.isFinite(initQuote) || initQuote <= 0) {
         setTradeMessage("Please provide positive initial reserves for Base and Quote.", true);
+        return;
+      }
+
+      if (!Number.isFinite(anchor) || anchor <= 0) {
+        setTradeMessage("Please provide a positive anchor price before initializing.", true);
         return;
       }
 
@@ -557,7 +562,7 @@
       R_base0 = initBase;
       R_quote0 = initQuote;
       k = R_base * R_quote;
-      lastAnchorPrice = anchor > 0 ? anchor : null;
+      lastAnchorPrice = anchor;
       isInitialized = true;
 
       setTradeMessage("AMM initialized. Baseline set to initial virtual reserves.", false);
@@ -569,10 +574,12 @@
         setTradeMessage("AMM is not initialized yet. Initialize it first.", true);
         return;
       }
+
       R_base0 = R_base;
       R_quote0 = R_quote;
       k = R_base * R_quote;
-      setTradeMessage("Baseline reset: curve re-centered around current virtual reserves.", false);
+
+      setTradeMessage("Baseline reset: r₀ updated from current virtual reserves (anchor unchanged).", false);
       updateStateDisplay();
     });
 
@@ -613,13 +620,13 @@
       const feeFactor = 1 + feeBps / 10000;
 
       const r0 = (R_base0 > 0) ? (R_quote0 / R_base0) : null;
-      if (r0 === null || r0 <= 0) {
-        setTradeMessage("Baseline ratio r0 is invalid. Try reinitializing or resetting baseline.", true);
+      if (!(r0 > 0)) {
+        setTradeMessage("Baseline ratio r₀ is invalid. Try reinitializing or resetting baseline.", true);
         return;
       }
 
       let R_base_new, R_quote_new;
-      let deltaBase, deltaQuote;
+      let deltaBase_virtual, deltaQuote_virtual;
       let P_curve;
 
       if (side === "SELL_BASE") {
@@ -634,15 +641,15 @@
         const deltaQuoteOut = R_quote - newRQuote;
 
         if (deltaQuoteOut <= 0) {
-          setTradeMessage("AMM would output non-positive quote. Trade rejected.", true);
+          setTradeMessage("AMM would output non-positive quote (virtual). Trade rejected.", true);
           return;
         }
 
         R_base_new = newRBase;
         R_quote_new = newRQuote;
-        deltaBase = deltaBaseIn;
-        deltaQuote = deltaQuoteOut;
-        P_curve = deltaQuoteOut / deltaBaseIn; // Quote per Base
+        deltaBase_virtual = deltaBaseIn;
+        deltaQuote_virtual = deltaQuoteOut;
+        P_curve = deltaQuoteOut / deltaBaseIn; // Quote per Base (virtual avg price)
       } else {
         // BUY_BASE: user sends ΔQuote (amountIn), receives ΔBase
         const deltaQuoteIn = amountInRaw;
@@ -655,34 +662,40 @@
         const deltaBaseOut = R_base - newRBase;
 
         if (deltaBaseOut <= 0) {
-          setTradeMessage("AMM would output non-positive base. Trade rejected.", true);
+          setTradeMessage("AMM would output non-positive base (virtual). Trade rejected.", true);
           return;
         }
 
         R_base_new = newRBase;
         R_quote_new = newRQuote;
-        deltaBase = deltaBaseOut;
-        deltaQuote = deltaQuoteIn;
-        P_curve = deltaQuoteIn / deltaBaseOut; // Quote per Base
+        deltaBase_virtual = deltaBaseOut;
+        deltaQuote_virtual = deltaQuoteIn;
+        P_curve = deltaQuoteIn / deltaBaseOut; // Quote per Base (virtual avg price)
       }
 
+      // Multiplier and execution price
       const m = P_curve / r0;
       const P_exec = P_anchor * m;
 
-      let deltaBaseUser, deltaQuoteUser, P_final;
+      // User-facing amounts (based on P_exec, then apply fee)
+      let deltaBase_user, deltaQuote_user, P_final;
       if (side === "BUY_BASE") {
-        // User pays deltaQuote, receives less Base due to fee
-        deltaQuoteUser = deltaQuote;
-        deltaBaseUser = deltaBase / feeFactor;
-        P_final = deltaQuoteUser / deltaBaseUser; // higher than P_exec
+        const quoteInUser = amountInRaw;
+        const baseOutPreFee = quoteInUser / P_exec;
+        const baseOutUser = baseOutPreFee / feeFactor;
+        deltaBase_user = baseOutUser;
+        deltaQuote_user = quoteInUser;
+        P_final = deltaQuote_user / deltaBase_user; // effective user price (incl. fee)
       } else {
-        // SELL_BASE: user sends deltaBase, receives less Quote due to fee
-        deltaBaseUser = deltaBase;
-        deltaQuoteUser = deltaQuote / feeFactor;
-        P_final = deltaQuoteUser / deltaBaseUser; // lower than P_exec
+        const baseInUser = amountInRaw;
+        const quoteOutPreFee = baseInUser * P_exec;
+        const quoteOutUser = quoteOutPreFee / feeFactor;
+        deltaBase_user = baseInUser;
+        deltaQuote_user = quoteOutUser;
+        P_final = deltaQuote_user / deltaBase_user;
       }
 
-      // Slippage vs reference = anchor (for simplicity)
+      // Slippage vs anchor
       const P_ref = P_anchor;
       let slippageBps = null;
       if (P_ref > 0) {
@@ -731,7 +744,7 @@
         }
       }
 
-      // All good: commit state
+      // Commit virtual reserves
       R_base = R_base_new;
       R_quote = R_quote_new;
       k = R_base * R_quote;
@@ -751,11 +764,12 @@
           <div><strong>Side:</strong> ${sideText}</div>
           <div><strong>amountIn:</strong> ${fmt(amountInRaw)}</div>
           <div style="margin-top:6px;">
-            <strong>Curve (virtual AMM):</strong><br/>
-            ΔBase (AMM): ${fmt(deltaBase)}<br/>
-            ΔQuote (AMM): ${fmt(deltaQuote)}<br/>
+            <strong>Virtual AMM (inventory only):</strong><br/>
+            ΔBase (virtual): ${fmt(deltaBase_virtual)}<br/>
+            ΔQuote (virtual): ${fmt(deltaQuote_virtual)}<br/>
             P_curve = ΔQuote / ΔBase = <code>${fmt(P_curve)}</code> ${quoteSymbol} per ${baseSymbol}<br/>
-            Multiplier m = P_curve / r0 = <code>${fmt(m)}</code><br/>
+            r₀ = <code>${fmt(r0)}</code><br/>
+            Multiplier m = P_curve / r₀ = <code>${fmt(m)}</code><br/>
           </div>
           <div style="margin-top:6px;">
             <strong>Anchor + deviation:</strong><br/>
@@ -763,8 +777,9 @@
             P_exec = P_anchor * m = <code>${fmt(P_exec)}</code><br/>
           </div>
           <div style="margin-top:6px;">
-            <strong>After fee (${fmt(feeBps, 2)} bps):</strong><br/>
-            User receives ${fmt(deltaBaseUser)} ${baseSymbol} and ${fmt(deltaQuoteUser)} ${quoteSymbol} (depending on side).<br/>
+            <strong>User amounts (incl. fee ${fmt(feeBps,2)} bps):</strong><br/>
+            User ΔBase: ${fmt(deltaBase_user)} ${baseSymbol}<br/>
+            User ΔQuote: ${fmt(deltaQuote_user)} ${quoteSymbol}<br/>
             Effective user price P_final = <code>${fmt(P_final)}</code> ${quoteSymbol} per ${baseSymbol}<br/>
             Slippage vs anchor = ${slippageBps !== null ? fmt(slippageBps, 2) : "–"} bps
           </div>
@@ -776,8 +791,8 @@
         index: tradeCount,
         side,
         amountIn: amountInRaw,
-        deltaBase,
-        deltaQuote,
+        deltaBase: deltaBase_virtual,
+        deltaQuote: deltaQuote_virtual,
         P_curve,
         m,
         P_exec,
