@@ -2,795 +2,389 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Virtual AMM + Anchor Price Playground</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dynamic Fee AMM Simulator</title>
   <style>
-    * {
-      box-sizing: border-box;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    :root {
+      --bg: #0f172a;        /* slate-900 */
+      --panel: #111827;     /* gray-900 */
+      --muted: #334155;     /* slate-600 */
+      --text: #e5e7eb;      /* gray-200 */
+      --accent: #22c55e;    /* green-500 */
+      --warn: #f59e0b;      /* amber-500 */
+      --error: #ef4444;     /* red-500 */
+      --border: #1f2937;    /* gray-800 */
     }
-
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      padding: 20px;
-      background: #0f172a;
-      color: #e5e7eb;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(1200px 800px at 80% -20%, #1f2937, #0b1022 60%, #0a0f20 100%);
+      color: var(--text);
     }
-
-    h1, h2, h3 {
-      margin-top: 0;
-      color: #f9fafb;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .grid {
+    header {
+      padding: 24px 20px 8px;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 16px;
-      margin-bottom: 16px;
-    }
-
-    .card {
-      background: #020617;
-      border-radius: 16px;
-      padding: 16px 18px 18px;
-      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
-      border: 1px solid #1f2937;
-    }
-
-    label {
-      display: block;
-      font-size: 13px;
-      margin-bottom: 4px;
-      color: #9ca3af;
-    }
-
-    input, select {
-      width: 100%;
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid #374151;
-      background: #020617;
-      color: #e5e7eb;
-      font-size: 14px;
-    }
-
-    input:focus, select:focus {
-      outline: none;
-      border-color: #4ade80;
-      box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.5);
-    }
-
-    .row {
-      display: flex;
-      gap: 10px;
-    }
-
-    .row > div {
-      flex: 1;
-    }
-
-    .btn {
-      border: none;
-      border-radius: 999px;
-      padding: 8px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: transform 0.05s ease-out, box-shadow 0.05s ease-out, background 0.2s ease;
-      display: inline-flex;
-      align-items: center;
       gap: 6px;
     }
-
-    .btn-primary {
-      background: linear-gradient(135deg, #22c55e, #22d3ee);
-      color: #020617;
-      box-shadow: 0 12px 30px rgba(34, 197, 94, 0.35);
+    h1 { font-size: 22px; margin: 0; letter-spacing: 0.2px; }
+    p.sub { margin: 0; color: #9ca3af; font-size: 13px; }
+    .container {
+      padding: 16px 20px 40px;
+      display: grid; gap: 16px;
     }
-
-    .btn-secondary {
-      background: #111827;
-      color: #e5e7eb;
-      border: 1px solid #374151;
+    .grid { display: grid; gap: 12px; }
+    @media (min-width: 980px) {
+      .grid { grid-template-columns: 1.1fr 1.2fr; }
     }
-
-    .btn:active {
-      transform: translateY(1px) scale(0.99);
-      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+    .card {
+      background: rgba(17,24,39,0.75);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      backdrop-filter: blur(6px);
     }
-
-    .btn + .btn {
-      margin-left: 8px;
+    .section-title { font-size: 14px; color: #9ca3af; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: grid; gap: 6px; }
+    label { font-size: 12px; color: #94a3b8; }
+    input, select {
+      width: 100%; padding: 10px 12px; border-radius: 12px;
+      border: 1px solid #273043; background: #0b1222; color: var(--text);
+      outline: none; font-size: 14px;
     }
-
+    input:focus, select:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.2); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    button {
+      border: 1px solid #1f2937; border-radius: 12px; padding: 10px 14px; cursor: pointer;
+      background: linear-gradient(180deg, #1e293b, #111827);
+      color: var(--text); font-weight: 600; letter-spacing: .2px;
+    }
+    button.primary { background: linear-gradient(180deg, #22c55e, #15803d); border-color: #14532d; color: #041308; }
+    button.ghost { background: transparent; }
+    .note { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+    .result pre {
+      margin: 0; background: #0b1222; border: 1px solid #273043; padding: 14px; border-radius: 12px; overflow: auto;
+      font-size: 13px; line-height: 1.45; max-height: 420px;
+    }
     .pill {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      background: rgba(148, 163, 184, 0.18);
-      color: #e5e7eb;
+      display: inline-flex; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 999px; border: 1px solid #273043; background: #0b1222; font-size: 12px; color: #cbd5e1;
     }
-
-    .pill-good {
-      background: rgba(74, 222, 128, 0.15);
-      color: #bbf7d0;
-    }
-
-    .pill-bad {
-      background: rgba(248, 113, 113, 0.18);
-      color: #fecaca;
-    }
-
-    .state-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    .state-item {
-      padding: 6px 8px;
-      border-radius: 12px;
-      background: #020617;
-      border: 1px solid #1f2937;
-      font-size: 12px;
-    }
-
-    .state-item span {
-      display: block;
-    }
-
-    .state-label {
-      color: #9ca3af;
-      font-size: 11px;
-    }
-
-    .state-value {
-      font-family: "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      color: #e5e7eb;
-      font-size: 12px;
-      margin-top: 2px;
-    }
-
-    .muted {
-      font-size: 12px;
-      color: #9ca3af;
-    }
-
-    .error {
-      color: #fecaca;
-      background: rgba(127, 29, 29, 0.35);
-      border-radius: 12px;
-      padding: 8px 10px;
-      font-size: 12px;
-      margin-top: 10px;
-      border: 1px solid rgba(248, 113, 113, 0.4);
-    }
-
-    .success {
-      color: #bbf7d0;
-      background: rgba(22, 101, 52, 0.35);
-      border-radius: 12px;
-      padding: 8px 10px;
-      font-size: 12px;
-      margin-top: 10px;
-      border: 1px solid rgba(74, 222, 128, 0.5);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-      margin-top: 8px;
-    }
-
-    th, td {
-      padding: 6px 8px;
-      border-bottom: 1px solid #1f2937;
-    }
-
-    th {
-      text-align: left;
-      color: #9ca3af;
-      font-weight: 500;
-      background: #020617;
-      position: sticky;
-      top: 0;
-      z-index: 1;
-    }
-
-    tbody tr:nth-child(even) {
-      background: rgba(15, 23, 42, 0.6);
-    }
-
-    .history-container {
-      max-height: 220px;
-      overflow: auto;
-      border-radius: 12px;
-      border: 1px solid #1f2937;
-    }
-
-    .badge-buy {
-      color: #bbf7d0;
-    }
-
-    .badge-sell {
-      color: #fecaca;
-    }
+    .stack { display: grid; gap: 10px; }
+    .inline { display: inline-flex; align-items: center; gap: 8px; }
+    .muted { color: #9ca3af; }
+    footer { padding: 16px 20px 30px; color: #64748b; font-size: 12px; text-align: center; }
   </style>
 </head>
 <body>
+  <header>
+    <h1>Dynamic Fee AMM — Oracle-Pegged Simulator</h1>
+    <p class="sub">Single-file demo. Set pool state, pick trade, and see fee % and units (USDC). Optionally apply the trade to update the pool.</p>
+  </header>
   <div class="container">
-    <h1>Virtual AMM + Anchor Price Playground</h1>
-    <p class="muted">
-      Play with a TSLA / USDC-style pair. The AMM uses virtual constant-product reserves and an anchor price.
-      You can run multiple trades and see how prices & reserves move.
-    </p>
-
     <div class="grid">
-      <!-- Global config and initialization -->
+      <!-- Left: Inputs -->
       <div class="card">
-        <div class="row" style="align-items:center; justify-content:space-between;">
-          <h2 style="margin-bottom:4px;">Market Setup</h2>
-          <span class="pill">Config</span>
-        </div>
-
-        <div class="row">
-          <div>
-            <label for="baseSymbol">Base symbol</label>
-            <input id="baseSymbol" type="text" value="TSLA" />
+        <h3 class="section-title">Pool & Parameters</h3>
+        <div class="stack">
+          <div class="row">
+            <div class="field">
+              <label>vD — Pool TD balance</label>
+              <input id="vD" type="number" step="any" value="50000" />
+            </div>
+            <div class="field">
+              <label>vS — Pool USDC balance</label>
+              <input id="vS" type="number" step="any" value="100000" />
+            </div>
           </div>
-          <div>
-            <label for="quoteSymbol">Quote symbol</label>
-            <input id="quoteSymbol" type="text" value="USDC" />
+          <div class="row">
+            <div class="field">
+              <label>Oracle Price (USDC per TD)</label>
+              <input id="Poracle" type="number" step="any" value="2.0" />
+            </div>
+            <div class="field">
+              <label>α — Sensitivity</label>
+              <input id="alpha" type="number" step="any" value="1.0" />
+            </div>
           </div>
-        </div>
-
-        <div class="row" style="margin-top:8px;">
-          <div>
-            <label for="anchorPrice">Anchor price (Quote per 1 Base)</label>
-            <input id="anchorPrice" type="number" step="0.0000001" value="2" />
-          </div>
-          <div>
-            <label for="feeBps">Fee (bps)</label>
-            <input id="feeBps" type="number" step="1" value="10" />
-          </div>
-        </div>
-
-        <h3 style="margin-top:14px;">Initial virtual reserves</h3>
-        <p class="muted">
-          These feed the virtual AMM. They do not have to match real wallet balances.
-        </p>
-
-        <div class="row">
-          <div>
-            <label for="initBase">Initial Base reserve (R_base)</label>
-            <input id="initBase" type="number" step="0.0000001" value="100" />
-          </div>
-          <div>
-            <label for="initQuote">Initial Quote reserve (R_quote)</label>
-            <input id="initQuote" type="number" step="0.0000001" value="200" />
+          <div class="row">
+            <div class="field">
+              <label>Base Fee f<sub>base</sub> (fraction)</label>
+              <input id="fbase" type="number" step="any" value="0.003" />
+            </div>
+            <div class="field">
+              <label>Min / Max Fee (fraction)</label>
+              <div class="row">
+                <input id="fmin" type="number" step="any" value="0.001" />
+                <input id="fmax" type="number" step="any" value="0.01" />
+              </div>
+            </div>
           </div>
         </div>
-
-        <div style="margin-top:12px;">
-          <button id="btnInit" class="btn btn-primary">
-            🔄 Initialize / Reinitialize AMM
-          </button>
-          <button id="btnResetBaseline" class="btn btn-secondary">
-            🎯 Reset baseline to current reserves
-          </button>
-        </div>
-
-        <p class="muted" style="margin-top:10px;">
-          Init/Reinit sets <code>R_base</code>, <code>R_quote</code>, <code>R_base0</code>, <code>R_quote0</code> and <code>k</code>.
-          Reset baseline keeps current reserves but recenters the curve (updates baseline).
-        </p>
-      </div>
-
-      <!-- Current state -->
-      <div class="card">
-        <div class="row" style="align-items:center; justify-content:space-between;">
-          <h2 style="margin-bottom:4px;">Current State</h2>
-          <span id="statusPill" class="pill-bad pill">Uninitialized</span>
-        </div>
-
-        <div class="state-grid">
-          <div class="state-item">
-            <span class="state-label">R_base (virtual)</span>
-            <span id="stateRBase" class="state-value">–</span>
+        <hr style="border: none; border-top: 1px solid var(--border); margin: 14px 0"/>
+        <h3 class="section-title">Trade</h3>
+        <div class="stack">
+          <div class="row">
+            <div class="field">
+              <label>Direction</label>
+              <select id="direction">
+                <option value="buy" selected>Buy TD (pay USDC)</option>
+                <option value="sell">Sell TD (receive USDC)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Enter either Amount TD or Amount USDC</label>
+              <div class="row">
+                <input id="amountTD" type="number" step="any" placeholder="Amount TD" />
+                <input id="amountUSDC" type="number" step="any" placeholder="Amount USDC" />
+              </div>
+            </div>
           </div>
-          <div class="state-item">
-            <span class="state-label">R_quote (virtual)</span>
-            <span id="stateRQuote" class="state-value">–</span>
+          <label class="inline"><input type="checkbox" id="applyTrade" /> <span>Apply trade to pool after simulation</span></label>
+          <div class="actions">
+            <button class="primary" id="simulateBtn">Simulate</button>
+            <button class="ghost" id="resetBtn">Reset</button>
           </div>
-          <div class="state-item">
-            <span class="state-label">R_base0 (baseline)</span>
-            <span id="stateRBase0" class="state-value">–</span>
-          </div>
-          <div class="state-item">
-            <span class="state-label">R_quote0 (baseline)</span>
-            <span id="stateRQuote0" class="state-value">–</span>
-          </div>
-          <div class="state-item">
-            <span class="state-label">r0 = R_quote0 / R_base0</span>
-            <span id="stateR0" class="state-value">–</span>
-          </div>
-          <div class="state-item">
-            <span class="state-label">r_pre = R_quote / R_base</span>
-            <span id="stateRpre" class="state-value">–</span>
-          </div>
-          <div class="state-item">
-            <span class="state-label">k = R_base * R_quote</span>
-            <span id="stateK" class="state-value">–</span>
-          </div>
-          <div class="state-item">
-            <span class="state-label">Last anchor price</span>
-            <span id="stateAnchor" class="state-value">–</span>
-          </div>
-        </div>
-
-        <p class="muted" style="margin-top:10px;">
-          All math is done on virtual reserves only. Real wallet balances are ignored in this toy playground.
-        </p>
-      </div>
-    </div>
-
-    <div class="grid">
-      <!-- Trade form -->
-      <div class="card">
-        <div class="row" style="align-items:center; justify-content:space-between;">
-          <h2 style="margin-bottom:4px;">New Trade</h2>
-          <span class="pill">Swap</span>
-        </div>
-
-        <div class="row">
-          <div>
-            <label for="side">Side</label>
-            <select id="side">
-              <option value="BUY_BASE">Buy Base with Quote</option>
-              <option value="SELL_BASE">Sell Base for Quote</option>
-            </select>
-          </div>
-          <div>
-            <label id="amountInLabel" for="amountIn">Amount in Quote (amountIn)</label>
-            <input id="amountIn" type="number" step="0.0000001" value="10" />
-          </div>
-        </div>
-
-        <h3 style="margin-top:12px;">User protections (optional)</h3>
-        <div class="row">
-          <div>
-            <label for="userLimitPrice">User limit price (Quote per Base)</label>
-            <input id="userLimitPrice" type="number" step="0.0000001" value="" placeholder="empty = ignore" />
-          </div>
-          <div>
-            <label for="maxSlippageBps">Max slippage (bps) vs anchor</label>
-            <input id="maxSlippageBps" type="number" step="1" value="" placeholder="empty = ignore" />
-          </div>
-        </div>
-
-        <div style="margin-top:12px;">
-          <button id="btnTrade" class="btn btn-primary">
-            🚀 Execute trade
-          </button>
-        </div>
-
-        <div id="tradeMessage"></div>
-      </div>
-
-      <!-- Last trade result -->
-      <div class="card">
-        <div class="row" style="align-items:center; justify-content:space-between;">
-          <h2 style="margin-bottom:4px;">Last Trade Result</h2>
-          <span class="pill">Summary</span>
-        </div>
-
-        <div id="lastTradeSummary" class="muted">
-          No trades yet.
+          <div class="note">Fee is computed from the <b>pre-trade</b> pool state using r = (vD × Poracle) / vS. Buy uses price = Poracle × (1 + f). Sell uses price = Poracle × (1 - f).</div>
         </div>
       </div>
-    </div>
 
-    <!-- Trade history -->
-    <div class="card" style="margin-top:4px;">
-      <div class="row" style="align-items:center; justify-content:space-between;">
-        <h2 style="margin-bottom:4px;">Trade History</h2>
-        <span class="pill">Session</span>
-      </div>
-      <p class="muted">
-        Each row shows curve price, multiplier, execution price vs anchor, and final user price including fee.
-      </p>
-      <div class="history-container">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Side</th>
-              <th>amountIn</th>
-              <th>ΔBase</th>
-              <th>ΔQuote</th>
-              <th>P_curve</th>
-              <th>m</th>
-              <th>P_exec</th>
-              <th>P_final</th>
-              <th>Slippage (bps)</th>
-            </tr>
-          </thead>
-          <tbody id="historyBody">
-          </tbody>
-        </table>
+      <!-- Right: Results -->
+      <div class="card result">
+        <h3 class="section-title">Result</h3>
+        <div class="stack" id="summaryPills" style="display:none"></div>
+        <pre id="output">Fill the form and click "Simulate".</pre>
       </div>
     </div>
   </div>
+  <footer>
+    Built for demo purposes. No external libraries. © 2025
+  </footer>
 
   <script>
-    // --------- State ---------
-    let isInitialized = false;
-    let R_base = 0;
-    let R_quote = 0;
-    let R_base0 = 0;
-    let R_quote0 = 0;
-    let k = 0;
-    let lastAnchorPrice = null;
-    let tradeCount = 0;
+    // -------- Core math (mirrors whitepaper) --------
+    const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
-    // --------- Helpers ---------
-    function fmt(x, digits = 6) {
-      if (x === null || x === undefined || Number.isNaN(x)) return "–";
-      return Number(x).toFixed(digits);
+    function computeFeePct({ vD, vS, Poracle, fbase, fmin, fmax, alpha }) {
+      const r = (vD * Poracle) / vS;
+      const f = clamp(fbase * Math.pow(r, alpha), fmin, fmax);
+      return { r, f };
     }
 
-    function updateStateDisplay() {
-      const stateRBase = document.getElementById("stateRBase");
-      const stateRQuote = document.getElementById("stateRQuote");
-      const stateRBase0 = document.getElementById("stateRBase0");
-      const stateRQuote0 = document.getElementById("stateRQuote0");
-      const stateR0 = document.getElementById("stateR0");
-      const stateRpre = document.getElementById("stateRpre");
-      const stateK = document.getElementById("stateK");
-      const stateAnchor = document.getElementById("stateAnchor");
-      const statusPill = document.getElementById("statusPill");
+    function simulateTrade(params) {
+      const { type, amountTD, amountUSDC, vD, vS, Poracle, fbase, fmin, fmax, alpha } = params;
+      if (!['buy', 'sell'].includes(type)) throw new Error('Direction must be buy or sell');
+      if (!(vD > 0 && vS > 0)) throw new Error('Pool balances must be positive');
+      if (!(Poracle > 0)) throw new Error('Oracle price must be positive');
 
-      if (!isInitialized) {
-        statusPill.textContent = "Uninitialized";
-        statusPill.className = "pill pill-bad";
-        stateRBase.textContent = "–";
-        stateRQuote.textContent = "–";
-        stateRBase0.textContent = "–";
-        stateRQuote0.textContent = "–";
-        stateR0.textContent = "–";
-        stateRpre.textContent = "–";
-        stateK.textContent = "–";
-        stateAnchor.textContent = "–";
-        return;
+      const feeFromR = (r) => clamp(fbase * Math.pow(r, alpha), fmin, fmax);
+      const tol = 1e-12;
+      const maxIter = 64;
+
+      let qtyTD, f = feeFromR((vD * Poracle) / vS); // initial guess
+      let pricePerTD, feeUSDC, grossUSDC, netUSDC, rPost;
+
+      if (type === 'buy') {
+        if (isFinite(amountTD)) {
+          qtyTD = amountTD;
+          for (let i = 0; i < maxIter; i++) {
+            const payment = qtyTD * Poracle * (1 + f);
+            const vDpost = vD - qtyTD;
+            const vSpost = vS + payment;
+            if (vDpost < 0) throw new Error('Insufficient TD in pool for this buy.');
+            rPost = (vDpost * Poracle) / vSpost;
+            const fNew = feeFromR(rPost);
+            if (Math.abs(fNew - f) < tol) { f = fNew; break; }
+            f = fNew;
+          }
+          pricePerTD = Poracle * (1 + f);
+          grossUSDC = qtyTD * Poracle;
+          feeUSDC   = qtyTD * Poracle * f;
+          netUSDC   = qtyTD * pricePerTD; // paid
+        } else if (isFinite(amountUSDC)) {
+          for (let i = 0; i < maxIter; i++) {
+            qtyTD = amountUSDC / (Poracle * (1 + f));
+            const vDpost = vD - qtyTD;
+            const vSpost = vS + amountUSDC;
+            if (vDpost < 0) throw new Error('Insufficient TD in pool for this buy.');
+            rPost = (vDpost * Poracle) / vSpost;
+            const fNew = feeFromR(rPost);
+            if (Math.abs(fNew - f) < tol) { f = fNew; break; }
+            f = fNew;
+          }
+          pricePerTD = Poracle * (1 + f);
+          grossUSDC = qtyTD * Poracle;
+          feeUSDC   = qtyTD * Poracle * f;
+          netUSDC   = amountUSDC; // paid
+        } else throw new Error('Provide amount TD or amount USDC');
+      } else { // sell
+        if (isFinite(amountTD)) {
+          qtyTD = amountTD;
+          for (let i = 0; i < maxIter; i++) {
+            const proceeds = qtyTD * Poracle * (1 - f);
+            const vDpost = vD + qtyTD;
+            const vSpost = vS - proceeds;
+            if (vSpost < 0) throw new Error('Insufficient USDC in pool for this sell.');
+            rPost = (vDpost * Poracle) / vSpost;
+            const fNew = feeFromR(rPost);
+            if (Math.abs(fNew - f) < tol) { f = fNew; break; }
+            f = fNew;
+          }
+          pricePerTD = Poracle * (1 - f);
+          grossUSDC = qtyTD * Poracle;
+          feeUSDC   = qtyTD * Poracle * f;
+          netUSDC   = qtyTD * pricePerTD; // received
+        } else if (isFinite(amountUSDC)) {
+          for (let i = 0; i < maxIter; i++) {
+            qtyTD = amountUSDC / (Poracle * (1 - f));
+            const vDpost = vD + qtyTD;
+            const vSpost = vS - amountUSDC;
+            if (vSpost < 0) throw new Error('Insufficient USDC in pool for this sell.');
+            rPost = (vDpost * Poracle) / vSpost;
+            const fNew = feeFromR(rPost);
+            if (Math.abs(fNew - f) < tol) { f = fNew; break; }
+            f = fNew;
+          }
+          pricePerTD = Poracle * (1 - f);
+          grossUSDC = qtyTD * Poracle;
+          feeUSDC   = qtyTD * Poracle * f;
+          netUSDC   = amountUSDC; // received
+        } else throw new Error('Provide amount TD or amount USDC');
       }
 
-      statusPill.textContent = "Active";
-      statusPill.className = "pill pill-good";
-
-      const r0 = (R_base0 > 0) ? (R_quote0 / R_base0) : null;
-      const rpre = (R_base > 0) ? (R_quote / R_base) : null;
-
-      stateRBase.textContent = fmt(R_base);
-      stateRQuote.textContent = fmt(R_quote);
-      stateRBase0.textContent = fmt(R_base0);
-      stateRQuote0.textContent = fmt(R_quote0);
-      stateR0.textContent = fmt(r0);
-      stateRpre.textContent = fmt(rpre);
-      stateK.textContent = fmt(k);
-      stateAnchor.textContent = lastAnchorPrice !== null ? fmt(lastAnchorPrice) : "–";
-    }
-
-    function setTradeMessage(text, isError = false) {
-      const el = document.getElementById("tradeMessage");
-      if (!text) {
-        el.innerHTML = "";
-        return;
-      }
-      el.className = isError ? "error" : "success";
-      el.innerHTML = text;
-    }
-
-    function appendHistoryRow(row) {
-      const tbody = document.getElementById("historyBody");
-      const tr = document.createElement("tr");
-
-      const td = (text) => {
-        const el = document.createElement("td");
-        el.textContent = text;
-        return el;
+      return {
+        direction: type,
+        oraclePrice_USDC_per_TD: Poracle,
+        imbalanceRatio_r: rPost,
+        feePct: f * 100,
+        priceUsed_USDC_per_TD: pricePerTD,
+        tradeSize_TD: qtyTD,
+        fee_USDC: feeUSDC,
+        oracleValue_USDC: grossUSDC,
+        totalPaidOrReceived_USDC: netUSDC,
       };
-
-      tr.appendChild(td(row.index));
-      const sideCell = td(row.side);
-      sideCell.className = row.side === "BUY_BASE" ? "badge-buy" : "badge-sell";
-      tr.appendChild(sideCell);
-      tr.appendChild(td(fmt(row.amountIn)));
-      tr.appendChild(td(fmt(row.deltaBase)));
-      tr.appendChild(td(fmt(row.deltaQuote)));
-      tr.appendChild(td(fmt(row.P_curve)));
-      tr.appendChild(td(fmt(row.m)));
-      tr.appendChild(td(fmt(row.P_exec)));
-      tr.appendChild(td(fmt(row.P_final)));
-      tr.appendChild(td(row.slippageBps !== null ? fmt(row.slippageBps, 2) : "–"));
-
-      tbody.insertBefore(tr, tbody.firstChild);
     }
 
-    function updateAmountInLabel() {
-      const side = document.getElementById("side").value;
-      const baseSymbol = document.getElementById("baseSymbol").value || "Base";
-      const quoteSymbol = document.getElementById("quoteSymbol").value || "Quote";
-      const label = document.getElementById("amountInLabel");
-
-      if (side === "BUY_BASE") {
-        label.textContent = `Amount in ${quoteSymbol} (amountIn)`;
+    function applyTradeToPool(pool, trade) {
+      const { direction, tradeSize_TD, totalPaidOrReceived_USDC } = {
+        direction: trade.direction,
+        tradeSize_TD: trade.tradeSize_TD,
+        totalPaidOrReceived_USDC: trade.totalPaidOrReceived_USDC
+      };
+      const next = { ...pool };
+      if (direction === 'buy') {
+        // User receives TD, pays USDC to pool
+        next.vD -= tradeSize_TD;
+        next.vS += totalPaidOrReceived_USDC;
       } else {
-        label.textContent = `Amount in ${baseSymbol} (amountIn)`;
+        // Sell TD: user gives TD, receives USDC from pool
+        next.vD += tradeSize_TD;
+        next.vS -= totalPaidOrReceived_USDC;
       }
+      return next;
     }
 
-    // --------- Event handlers ---------
-    document.getElementById("side").addEventListener("change", updateAmountInLabel);
+    // -------- UI glue --------
+    const $ = id => document.getElementById(id);
 
-    document.getElementById("btnInit").addEventListener("click", () => {
-      const initBase = parseFloat(document.getElementById("initBase").value);
-      const initQuote = parseFloat(document.getElementById("initQuote").value);
-      const anchor = parseFloat(document.getElementById("anchorPrice").value || "0");
+    function readParams() {
+      const vD = parseFloat($("vD").value);
+      const vS = parseFloat($("vS").value);
+      const Poracle = parseFloat($("Poracle").value);
+      const alpha = parseFloat($("alpha").value);
+      const fbase = parseFloat($("fbase").value);
+      const fmin  = parseFloat($("fmin").value);
+      const fmax  = parseFloat($("fmax").value);
+      const type = $("direction").value;
+      const amountTD = parseFloat($("amountTD").value);
+      const amountUSDC = parseFloat($("amountUSDC").value);
+      const applyTrade = $("applyTrade").checked;
+      return { vD, vS, Poracle, alpha, fbase, fmin, fmax, type, amountTD, amountUSDC, applyTrade };
+    }
 
-      if (!Number.isFinite(initBase) || initBase <= 0 ||
-          !Number.isFinite(initQuote) || initQuote <= 0) {
-        setTradeMessage("Please provide positive initial reserves for Base and Quote.", true);
-        return;
+    function formatNumber(n, digits = 6) {
+      if (!isFinite(n)) return String(n);
+      const abs = Math.abs(n);
+      const opts = abs >= 1 ? { maximumFractionDigits: 4 } : { maximumSignificantDigits: digits };
+      return n.toLocaleString(undefined, opts);
+    }
+
+    function pill(label, value) {
+      const span = document.createElement('span');
+      span.className = 'pill';
+      span.innerHTML = `<span class="muted">${label}</span><b>${value}</b>`;
+      return span;
+    }
+
+    function render(result, poolBefore, poolAfter) {
+      const out = $("output");
+      const pills = $("summaryPills");
+      pills.innerHTML = '';
+      pills.style.display = 'grid';
+      pills.append(
+        pill('Direction', result.direction.toUpperCase()),
+        pill('Fee %', formatNumber(result.feePct, 4) + '%'),
+        pill(result.direction === 'buy' ? 'USDC Paid' : 'USDC Received', formatNumber(result.totalPaidOrReceived_USDC)),
+        pill('Fee (USDC)', formatNumber(result.fee_USDC)),
+        pill('Price Used', formatNumber(result.priceUsed_USDC_per_TD)),
+        pill('r', formatNumber(result.imbalanceRatio_r))
+      );
+
+      const payload = {
+        pool_before: poolBefore,
+        inputs: {
+          direction: result.direction,
+          oraclePrice_USDC_per_TD: result.oraclePrice_USDC_per_TD,
+        },
+        outputs: result,
+        pool_after: poolAfter || null
+      };
+      out.textContent = JSON.stringify(payload, (k, v) => typeof v === 'number' ? Number(v.toFixed(12)) : v, 2);
+    }
+
+    function reset() {
+      $("vD").value = 50000;
+      $("vS").value = 100000;
+      $("Poracle").value = 2.0;
+      $("alpha").value = 1.0;
+      $("fbase").value = 0.003;
+      $("fmin").value = 0.001;
+      $("fmax").value = 0.01;
+      $("direction").value = 'buy';
+      $("amountTD").value = '';
+      $("amountUSDC").value = '';
+      $("applyTrade").checked = false;
+      $("summaryPills").style.display = 'none';
+      $("output").textContent = 'Fill the form and click "Simulate".';
+    }
+
+    $("simulateBtn").addEventListener('click', () => {
+      try {
+        const p = readParams();
+        const { type, amountTD, amountUSDC, applyTrade, ...rest } = p;
+        const params = {
+          type,
+          amountTD: isFinite(amountTD) ? amountTD : undefined,
+          amountUSDC: isFinite(amountUSDC) ? amountUSDC : undefined,
+          ...rest
+        };
+        const poolBefore = { vD: rest.vD, vS: rest.vS };
+        const res = simulateTrade(params);
+        let poolAfter = null;
+        if (applyTrade) {
+          poolAfter = applyTradeToPool(poolBefore, res);
+          // Update inputs with new pool balances
+          $("vD").value = poolAfter.vD;
+          $("vS").value = poolAfter.vS;
+        }
+        render(res, poolBefore, poolAfter);
+      } catch (e) {
+        $("output").textContent = 'Error: ' + e.message;
       }
-
-      R_base = initBase;
-      R_quote = initQuote;
-      R_base0 = initBase;
-      R_quote0 = initQuote;
-      k = R_base * R_quote;
-      lastAnchorPrice = anchor > 0 ? anchor : null;
-      isInitialized = true;
-
-      setTradeMessage("AMM initialized. Baseline set to initial virtual reserves.", false);
-      updateStateDisplay();
     });
 
-    document.getElementById("btnResetBaseline").addEventListener("click", () => {
-      if (!isInitialized) {
-        setTradeMessage("AMM is not initialized yet. Initialize it first.", true);
-        return;
-      }
-      R_base0 = R_base;
-      R_quote0 = R_quote;
-      k = R_base * R_quote;
-      setTradeMessage("Baseline reset: curve re-centered around current virtual reserves.", false);
-      updateStateDisplay();
-    });
-
-    document.getElementById("btnTrade").addEventListener("click", () => {
-      if (!isInitialized) {
-        setTradeMessage("AMM is not initialized yet. Initialize it first.", true);
-        return;
-      }
-
-      setTradeMessage("");
-
-      const side = document.getElementById("side").value;
-      const baseSymbol = document.getElementById("baseSymbol").value || "Base";
-      const quoteSymbol = document.getElementById("quoteSymbol").value || "Quote";
-
-      const amountInRaw = parseFloat(document.getElementById("amountIn").value);
-      const anchorPriceInput = parseFloat(document.getElementById("anchorPrice").value);
-      const feeBpsInput = parseFloat(document.getElementById("feeBps").value);
-      const userLimitPriceInput = document.getElementById("userLimitPrice").value;
-      const maxSlippageBpsInput = document.getElementById("maxSlippageBps").value;
-
-      if (!Number.isFinite(amountInRaw) || amountInRaw <= 0) {
-        setTradeMessage("Please enter a positive amountIn.", true);
-        return;
-      }
-
-      const P_anchor = Number.isFinite(anchorPriceInput) && anchorPriceInput > 0
-        ? anchorPriceInput
-        : (lastAnchorPrice || null);
-
-      if (P_anchor === null) {
-        setTradeMessage("No valid anchor price available. Set one in the Market Setup section.", true);
-        return;
-      }
-
-      lastAnchorPrice = P_anchor; // keep latest
-      const feeBps = Number.isFinite(feeBpsInput) && feeBpsInput >= 0 ? feeBpsInput : 0;
-      const feeFactor = 1 + feeBps / 10000;
-
-      const r0 = (R_base0 > 0) ? (R_quote0 / R_base0) : null;
-      if (r0 === null || r0 <= 0) {
-        setTradeMessage("Baseline ratio r0 is invalid. Try reinitializing or resetting baseline.", true);
-        return;
-      }
-
-      let R_base_new, R_quote_new;
-      let deltaBase, deltaQuote;
-      let P_curve;
-
-      if (side === "SELL_BASE") {
-        // User sends ΔBase (amountIn), receives ΔQuote
-        const deltaBaseIn = amountInRaw;
-        const newRBase = R_base + deltaBaseIn;
-        if (newRBase <= 0) {
-          setTradeMessage("Resulting R_base would be non-positive.", true);
-          return;
-        }
-        const newRQuote = k / newRBase;
-        const deltaQuoteOut = R_quote - newRQuote;
-
-        if (deltaQuoteOut <= 0) {
-          setTradeMessage("AMM would output non-positive quote. Trade rejected.", true);
-          return;
-        }
-
-        R_base_new = newRBase;
-        R_quote_new = newRQuote;
-        deltaBase = deltaBaseIn;
-        deltaQuote = deltaQuoteOut;
-        P_curve = deltaQuoteOut / deltaBaseIn; // Quote per Base
-      } else {
-        // BUY_BASE: user sends ΔQuote (amountIn), receives ΔBase
-        const deltaQuoteIn = amountInRaw;
-        const newRQuote = R_quote + deltaQuoteIn;
-        if (newRQuote <= 0) {
-          setTradeMessage("Resulting R_quote would be non-positive.", true);
-          return;
-        }
-        const newRBase = k / newRQuote;
-        const deltaBaseOut = R_base - newRBase;
-
-        if (deltaBaseOut <= 0) {
-          setTradeMessage("AMM would output non-positive base. Trade rejected.", true);
-          return;
-        }
-
-        R_base_new = newRBase;
-        R_quote_new = newRQuote;
-        deltaBase = deltaBaseOut;
-        deltaQuote = deltaQuoteIn;
-        P_curve = deltaQuoteIn / deltaBaseOut; // Quote per Base
-      }
-
-      const m = P_curve / r0;
-      const P_exec = P_anchor * m;
-
-      let deltaBaseUser, deltaQuoteUser, P_final;
-      if (side === "BUY_BASE") {
-        // User pays deltaQuote, receives less Base due to fee
-        deltaQuoteUser = deltaQuote;
-        deltaBaseUser = deltaBase / feeFactor;
-        P_final = deltaQuoteUser / deltaBaseUser; // higher than P_exec
-      } else {
-        // SELL_BASE: user sends deltaBase, receives less Quote due to fee
-        deltaBaseUser = deltaBase;
-        deltaQuoteUser = deltaQuote / feeFactor;
-        P_final = deltaQuoteUser / deltaBaseUser; // lower than P_exec
-      }
-
-      // Slippage vs reference = anchor (for simplicity)
-      const P_ref = P_anchor;
-      let slippageBps = null;
-      if (P_ref > 0) {
-        slippageBps = Math.abs((P_final - P_ref) / P_ref) * 10000;
-      }
-
-      // Enforce userLimitPrice if provided
-      if (userLimitPriceInput.trim() !== "") {
-        const userLimitPrice = parseFloat(userLimitPriceInput);
-        if (!(Number.isFinite(userLimitPrice) && userLimitPrice > 0)) {
-          setTradeMessage("Invalid user limit price.", true);
-          return;
-        }
-        if (side === "BUY_BASE") {
-          if (P_final > userLimitPrice) {
-            setTradeMessage(
-              `Final price ${fmt(P_final)} exceeds user limit price ${fmt(userLimitPrice)}. Trade reverted.`,
-              true
-            );
-            return;
-          }
-        } else {
-          if (P_final < userLimitPrice) {
-            setTradeMessage(
-              `Final price ${fmt(P_final)} is below user limit price ${fmt(userLimitPrice)}. Trade reverted.`,
-              true
-            );
-            return;
-          }
-        }
-      }
-
-      // Enforce maxSlippageBps if provided
-      if (maxSlippageBpsInput.trim() !== "" && slippageBps !== null) {
-        const maxSlippage = parseFloat(maxSlippageBpsInput);
-        if (!(Number.isFinite(maxSlippage) && maxSlippage >= 0)) {
-          setTradeMessage("Invalid max slippage bps.", true);
-          return;
-        }
-        if (slippageBps > maxSlippage) {
-          setTradeMessage(
-            `Slippage ${fmt(slippageBps, 2)} bps exceeds max allowed ${fmt(maxSlippage, 2)} bps. Trade reverted.`,
-            true
-          );
-          return;
-        }
-      }
-
-      // All good: commit state
-      R_base = R_base_new;
-      R_quote = R_quote_new;
-      k = R_base * R_quote;
-      isInitialized = true;
-      updateStateDisplay();
-
-      tradeCount += 1;
-
-      const sideText = side === "BUY_BASE"
-        ? `Buy ${baseSymbol} with ${quoteSymbol}`
-        : `Sell ${baseSymbol} for ${quoteSymbol}`;
-
-      // Last trade summary
-      const summaryEl = document.getElementById("lastTradeSummary");
-      summaryEl.innerHTML = `
-        <div>
-          <div><strong>Side:</strong> ${sideText}</div>
-          <div><strong>amountIn:</strong> ${fmt(amountInRaw)}</div>
-          <div style="margin-top:6px;">
-            <strong>Curve (virtual AMM):</strong><br/>
-            ΔBase (AMM): ${fmt(deltaBase)}<br/>
-            ΔQuote (AMM): ${fmt(deltaQuote)}<br/>
-            P_curve = ΔQuote / ΔBase = <code>${fmt(P_curve)}</code> ${quoteSymbol} per ${baseSymbol}<br/>
-            Multiplier m = P_curve / r0 = <code>${fmt(m)}</code><br/>
-          </div>
-          <div style="margin-top:6px;">
-            <strong>Anchor + deviation:</strong><br/>
-            P_anchor = <code>${fmt(P_anchor)}</code><br/>
-            P_exec = P_anchor * m = <code>${fmt(P_exec)}</code><br/>
-          </div>
-          <div style="margin-top:6px;">
-            <strong>After fee (${fmt(feeBps, 2)} bps):</strong><br/>
-            User receives ${fmt(deltaBaseUser)} ${baseSymbol} and ${fmt(deltaQuoteUser)} ${quoteSymbol} (depending on side).<br/>
-            Effective user price P_final = <code>${fmt(P_final)}</code> ${quoteSymbol} per ${baseSymbol}<br/>
-            Slippage vs anchor = ${slippageBps !== null ? fmt(slippageBps, 2) : "–"} bps
-          </div>
-        </div>
-      `;
-
-      // History row
-      appendHistoryRow({
-        index: tradeCount,
-        side,
-        amountIn: amountInRaw,
-        deltaBase,
-        deltaQuote,
-        P_curve,
-        m,
-        P_exec,
-        P_final,
-        slippageBps
-      });
-
-      setTradeMessage("Trade executed successfully.", false);
-    });
-
-    // Initial label
-    updateAmountInLabel();
-    updateStateDisplay();
+    $("resetBtn").addEventListener('click', reset);
   </script>
 </body>
 </html>
