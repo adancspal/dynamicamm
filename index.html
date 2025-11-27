@@ -230,7 +230,7 @@
   <div class="container">
     <h1>Virtual AMM + Anchor Price Playground</h1>
     <p class="muted">
-      Anchor is the fair price. You choose Base and Quote inventory. Virtual AMM computes a deviation multiplier; user price = anchor × multiplier (plus fee).
+      Anchor is the fair price. You choose Base and Quote inventory. Virtual AMM computes a deviation multiplier; user price = average(anchor, anchor×multiplier) (then fee).
     </p>
 
     <div class="grid">
@@ -337,7 +337,7 @@
         </div>
 
         <p class="muted" style="margin-top:10px;">
-          Anchor is independent of reserves. Reserves drive the curve price <code>P_curve</code>, which becomes a multiplier over anchor.
+          Anchor is independent of reserves. Reserves drive the curve price <code>P_curve</code>, which becomes a multiplier over anchor. We now blend <code>P_anchor</code> and <code>P_anchor·m</code> by taking their average.
         </p>
       </div>
     </div>
@@ -405,7 +405,7 @@
         <span class="pill">Session</span>
       </div>
       <p class="muted">
-        Each row shows curve price, multiplier, execution price vs anchor, and final user price including fee.
+        Each row shows curve price, multiplier, execution price vs anchor (after blending), and final user price including fee.
       </p>
       <div class="history-container">
         <table>
@@ -675,9 +675,10 @@
 
       // Multiplier and execution price
       const m = P_curve / r0;
-      const P_exec = P_anchor * m;
+      const P_exec_raw = P_anchor * m;                // old execution price
+      const P_exec = (P_exec_raw + P_anchor) / 2;     // NEW: average(current exec, anchor)
 
-      // User-facing amounts (based on P_exec, then apply fee)
+      // User-facing amounts (based on blended P_exec, then apply fee)
       let deltaBase_user, deltaQuote_user, P_final;
       if (side === "BUY_BASE") {
         const quoteInUser = amountInRaw;
@@ -774,7 +775,8 @@
           <div style="margin-top:6px;">
             <strong>Anchor + deviation:</strong><br/>
             P_anchor = <code>${fmt(P_anchor)}</code><br/>
-            P_exec = P_anchor * m = <code>${fmt(P_exec)}</code><br/>
+            P_exec_raw = P_anchor * m = <code>${fmt(P_exec_raw)}</code><br/>
+            Blended P_exec = (P_exec_raw + P_anchor) / 2 = <code>${fmt(P_exec)}</code><br/>
           </div>
           <div style="margin-top:6px;">
             <strong>User amounts (incl. fee ${fmt(feeBps,2)} bps):</strong><br/>
@@ -786,7 +788,7 @@
         </div>
       `;
 
-      // History row
+      // History row (P_exec = blended)
       appendHistoryRow({
         index: tradeCount,
         side,
